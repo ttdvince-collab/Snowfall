@@ -57,25 +57,42 @@ static CGRect SFRectInTargetWindow(UIView *view, UIWindow *targetWindow) {
     if (!view.window || !targetWindow) {
         return CGRectNull;
     }
+
     CGRect inSourceWindow = [view convertRect:view.bounds toView:view.window];
     CGRect inScreen = [view.window convertRect:inSourceWindow toWindow:nil];
     return [targetWindow convertRect:inScreen fromWindow:nil];
 }
 
-static void SFScanView(UIView *view, UIWindow *targetWindow, CGRect screenBounds, std::unordered_set<int>& seen, std::vector<SFSurface>& output) {
+static void SFScanView(
+    UIView *view,
+    UIWindow *targetWindow,
+    CGRect screenBounds,
+    std::unordered_set<int>& seen,
+    std::vector<SFSurface>& output
+) {
     if (view.hidden || view.alpha < 0.05 || CGRectIsEmpty(view.bounds)) {
         return;
     }
 
     CGRect rect = SFRectInTargetWindow(view, targetWindow);
-    if (!CGRectIsNull(rect) && !CGRectIsEmpty(rect) && CGRectIntersectsRect(rect, screenBounds) && SFIsCandidateView(view, rect, screenBounds.size)) {
+
+    if (
+        !CGRectIsNull(rect) &&
+        !CGRectIsEmpty(rect) &&
+        CGRectIntersectsRect(rect, screenBounds) &&
+        SFIsCandidateView(view, rect, screenBounds.size)
+    ) {
         NSString *name = NSStringFromClass(view.class);
+
         if (SFContainsToken(name, @"IconView")) {
             rect.size.height *= 0.85;
         }
+
         rect = CGRectIntersection(rect, screenBounds);
+
         if (!CGRectIsEmpty(rect)) {
             int surfaceId = SFStableSurfaceId(view, rect);
+
             if (seen.insert(surfaceId).second) {
                 output.push_back(SFSurface{
                     surfaceId,
@@ -106,9 +123,11 @@ static void SFScanView(UIView *view, UIWindow *targetWindow, CGRect screenBounds
 
 - (instancetype)init {
     self = [super init];
+
     if (self) {
         _invalidated = YES;
     }
+
     return self;
 }
 
@@ -122,6 +141,7 @@ static void SFScanView(UIView *view, UIWindow *targetWindow, CGRect screenBounds
     }
 
     CFTimeInterval now = CACurrentMediaTime();
+
     if (!self.invalidated && now - self.lastRefresh < 2.0) {
         return _cached;
     }
@@ -132,34 +152,40 @@ static void SFScanView(UIView *view, UIWindow *targetWindow, CGRect screenBounds
     UIApplication *application = UIApplication.sharedApplication;
 
     NSMutableArray<UIWindow *> *windows = [NSMutableArray array];
-    if (@available(iOS 13.0, *)) {
-        for (UIScene *scene in application.connectedScenes) {
-            if (![scene isKindOfClass:UIWindowScene.class]) {
-                continue;
-            }
-            UIWindowScene *windowScene = (UIWindowScene *)scene;
-            [windows addObjectsFromArray:windowScene.windows];
+
+    for (UIScene *scene in application.connectedScenes) {
+        if (![scene isKindOfClass:UIWindowScene.class]) {
+            continue;
         }
-    } else {
-        [windows addObjectsFromArray:application.windows];
+
+        UIWindowScene *windowScene = (UIWindowScene *)scene;
+        [windows addObjectsFromArray:windowScene.windows];
     }
 
     for (UIWindow *candidateWindow in windows) {
         if (candidateWindow.hidden || candidateWindow.alpha < 0.05) {
             continue;
         }
+
         SFScanView(candidateWindow, window, screenBounds, seen, surfaces);
     }
 
     int bottomId = 2147483000;
+
     surfaces.push_back(SFSurface{
         bottomId,
-        SFRect{0.0f, (float)MAX(0.0, CGRectGetHeight(screenBounds) - 2.0), (float)CGRectGetWidth(screenBounds), 2.0f}
+        SFRect{
+            0.0f,
+            (float)MAX(0.0, CGRectGetHeight(screenBounds) - 2.0),
+            (float)CGRectGetWidth(screenBounds),
+            2.0f
+        }
     });
 
     _cached = surfaces;
     self.invalidated = NO;
     self.lastRefresh = now;
+
     return _cached;
 }
 
